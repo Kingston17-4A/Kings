@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>超級瑪利歐經典版 - Super Mario Classic</title>
+    <!-- Tailwind CSS 引入 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts 像素字型 -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #000;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+        /* 避免手機長按彈出選單 */
+        * {
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .pixel-text {
+            font-family: 'Press Start 2P', monospace;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen text-white p-2">
+
+    <!-- 遊戲主容器 -->
+    <div class="relative w-full max-w-4xl aspect-[16/10] bg-[#5c94fc] border-4 border-white rounded-lg shadow-2xl overflow-hidden flex flex-col">
+        
+        <!-- 頂部 HUD (經典 NES 風格) -->
+        <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start text-xs sm:text-sm md:text-base z-10 select-none bg-black/10 backdrop-blur-[2px]">
+            <div class="flex flex-col items-start">
+                <span>MARIO</span>
+                <span id="score-text">000000</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span>COINS</span>
+                <span id="coin-text">🪙 x00</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span>WORLD</span>
+                <span>1-1</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span>TIME</span>
+                <span id="time-text">300</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span>LIVES</span>
+                <span id="lives-text">❤️ x3</span>
+            </div>
+        </div>
+
+        <!-- Canvas 遊戲畫布 -->
+        <canvas id="gameCanvas" class="w-full flex-grow block bg-[#5c94fc]"></canvas>
+
+        <!-- 開始畫面 Overlay -->
+        <div id="start-screen" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-4 z-20 transition-all duration-300">
+            <h1 class="text-3xl sm:text-5xl md:text-6xl text-red-500 font-extrabold text-center drop-shadow-[0_5px_0_rgba(251,191,36,1)] mb-4 tracking-wider">
+                SUPER MARIO
+            </h1>
+            <h2 class="text-lg sm:text-xl md:text-2xl text-yellow-400 mb-8 tracking-widest text-center">
+                經典 HTML5 復刻版
+            </h2>
+            
+            <button id="start-btn" class="px-6 py-4 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm sm:text-lg border-b-4 border-red-900 rounded-lg transition-transform cursor-pointer">
+                開始遊戲 (START)
+            </button>
+
+            <!-- 操作說明 -->
+            <div class="mt-8 text-[10px] sm:text-xs text-gray-400 max-w-md text-center leading-relaxed">
+                <p class="text-yellow-400 mb-2">【操作說明】</p>
+                <p>電腦：左右方向鍵 / A、D 移動</p>
+                <p>跳躍：空格鍵 / W / 上方向鍵</p>
+                <p class="mt-1">手機：使用螢幕下方虛擬搖桿與按鍵</p>
+                <p class="text-red-400 mt-2">提示：踩踏栗寶寶，跳躍頂擊問號磚塊！</p>
+            </div>
+        </div>
+
+        <!-- 遊戲結束 Overlay -->
+        <div id="gameover-screen" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-4 z-20 hidden">
+            <h2 class="text-4xl sm:text-6xl text-red-600 font-bold mb-6 tracking-widest">GAME OVER</h2>
+            <p id="gameover-reason" class="text-sm sm:text-base text-gray-400 mb-8">瑪利歐沒命了！</p>
+            <button id="restart-btn" class="px-6 py-4 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-black font-bold text-sm sm:text-lg border-b-4 border-yellow-800 rounded-lg transition-transform cursor-pointer">
+                重新挑戰
+            </button>
+        </div>
+
+        <!-- 關卡清除 / 勝利 Overlay -->
+        <div id="victory-screen" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-4 z-20 hidden">
+            <h2 class="text-3xl sm:text-5xl text-yellow-400 font-bold mb-4 tracking-widest text-center animate-bounce">
+                STAGE CLEAR!
+            </h2>
+            <p class="text-sm sm:text-lg text-green-400 mb-6 text-center">恭喜你成功抵達終點城堡！</p>
+            <div class="bg-gray-800/80 p-4 rounded-lg border border-yellow-500 mb-8 text-xs sm:text-sm text-left space-y-2 min-w-[250px]">
+                <p>得分 (SCORE): <span id="final-score" class="text-yellow-300">000000</span></p>
+                <p>收集金幣 (COINS): <span id="final-coins" class="text-yellow-300">0</span></p>
+                <p>剩餘時間 (TIME): <span id="final-time" class="text-yellow-300">0</span></p>
+            </div>
+            <button id="play-again-btn" class="px-6 py-4 bg-green-500 hover:bg-green-600 active:scale-95 text-white font-bold text-sm sm:text-lg border-b-4 border-green-800 rounded-lg transition-transform cursor-pointer">
+                再玩一次
+            </button>
+        </div>
+    </div>
+
+    <!-- 手機虛擬搖桿 (僅在行動裝置或合適寬度顯示) -->
+    <div id="mobile-controls" class="w-full max-w-4xl mt-4 flex justify-between items-center px-4 md:px-12 select-none">
+        <!-- 左側 D-pad -->
+        <div class="flex space-x-2">
+            <button id="btn-left" class="w-16 h-16 bg-gray-800/80 active:bg-gray-700 active:scale-90 rounded-full border-2 border-gray-600 flex items-center justify-center touch-none">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <button id="btn-right" class="w-16 h-16 bg-gray-800/80 active:bg-gray-700 active:scale-90 rounded-full border-2 border-gray-600 flex items-center justify-center touch-none">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+        </div>
+        <!-- 右側 跳躍/跑 按鈕 -->
+        <div class="flex space-x-4">
+            <button id="btn-jump" class="w-16 h-16 bg-red-600/90 active:bg-red-500 active:scale-90 rounded-full border-2 border-red-400 flex items-center justify-center text-xl font-bold touch-none">
+                A
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 復古音效音訊引擎 (Web Audio API) ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            // 播放經典跳躍音效
+            playJump() {
+                this.init();
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.type = 'triangle';
+                const now = this.ctx.currentTime;
+                
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            // 吃金幣音效
+            playCoin() {
+                this.init();
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.type = 'sine';
+                const now = this.ctx.currentTime;
+                
+                osc.frequency.setValueAtTime(987.77, now); // B5
+                osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+                
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            // 踩踏怪物
+            playStomp() {
+                this.init();
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.type = 'sawtooth';
+                const now = this.ctx.currentTime;
+                
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.linearRampToValueAtTime(40, now + 0.1);
+                
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            // 瑪利歐縮小或死亡
+            playDie() {
+                this.init();
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.type = 'sawtooth';
+                const now = this.ctx.currentTime;
+
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.5);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+
+            // 頂破/撞擊磚塊
+            playBump() {
+                this.init();
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.type = 'triangle';
+                const now = this.ctx.currentTime;
+                
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.setValueAtTime(50, now + 0.08);
+                
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            // 通關樂章
+            playStageClear() {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [
+                    {f: 261.63, d: 0.1}, // C4
+                    {f: 329.63, d: 0.1}, // E4
+                    {f: 392.00, d: 0.1}, // G4
+                    {f: 523.25, d: 0.1}, // C5
+                    {f: 659.25, d: 0.1}, // E5
+                    {f: 783.99, d: 0.3}, // G5
+                ];
+
+                notes.forEach((note, index) => {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.type = 'square';
+                    
+                    const noteTime = now + (index * 0.12);
+                    osc.frequency.setValueAtTime(note.f, noteTime);
+                    gain.gain.setValueAtTime(0.15, noteTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, noteTime + note.d);
+                    
+                    osc.start(noteTime);
+                    osc.stop(noteTime + note.d);
+                });
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // --- 畫布基本設定 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 設置邏輯解析度 (與拉伸無關，用於確保各尺寸螢幕繪圖比例一致)
+        const VIEW_WIDTH = 800;
+        const VIEW_HEIGHT = 500;
+        canvas.width = VIEW_WIDTH;
+        canvas.height = VIEW_HEIGHT;
+
+        // --- 物理常數 ---
+        const GRAVITY = 0.6;
+        const FRICTION = 0.85;
+
+        // --- 遊戲狀態變數 ---
+        let score = 0;
+        let coins = 0;
+        let timeLeft = 300;
+        let lives = 3;
+        let gameActive = false;
+        let isGameOver = false;
+        let isVictory = false;
+        let lastTime = 0;
+        let timerInterval = null;
+
+        // 攝影機 X 軸偏移量
+        let cameraX = 0;
+
+        // 按鍵監聽
+        const keys = {
+            left: false,
+            right: false,
+            jump: false
+        };
+
+        // --- 核心實體類別 ---
+
+        // 1. 玩家 (瑪利歐)
+        class Player {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = 100;
+                this.y = 300;
+                this.width = 32;
+                this.height = 44;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 4.5;
+                this.jumpStrength = 13.5;
+                this.onGround = false;
+                this.facing = 'right';
+                this.frame = 0;
+                this.walkCycle = 0;
+                this.dead = false;
+                this.victoryAnim = false;
+            }
+
+            update() {
+                if (this.dead) {
+                    // 死亡動畫物理
+                    this.vy += 0.4;
+                    this.y += this.vy;
+                    return;
+                }
+
+                if (this.victoryAnim) {
+                    // 通關旗桿滑落/走向城堡動畫
+                    if (!this.onGround) {
+                        this.y += 2;
+                        if (this.y >= 388) { // 碰到地面
+                            this.y = 388;
+                            this.onGround = true;
+                        }
+                    } else {
+                        // 漫步走向右邊的城堡
+                        this.x += 1.5;
+                        this.walkCycle += 0.15;
+                    }
+                    return;
+                }
+
+                // 左右移動加速度
+                if (keys.left) {
+                    this.vx = -this.speed;
+                    this.facing = 'left';
+                    this.walkCycle += 0.2;
+                } else if (keys.right) {
+                    this.vx = this.speed;
+                    this.facing = 'right';
+                    this.walkCycle += 0.2;
+                } else {
+                    this.vx *= FRICTION;
+                }
+
+                // 限制最小速度
+                if (Math.abs(this.vx) < 0.1) this.vx = 0;
+
+                // 跳躍邏輯
+                if (keys.jump && this.onGround) {
+                    this.vy = -this.jumpStrength;
+                    this.onGround = false;
+                    audio.playJump();
+                }
+
+                // 重力套用
+                this.vy += GRAVITY;
+
+                // 位移
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 限制地圖左邊緣
+                if (this.x < 0) this.x = 0;
+
+                // 掉進深淵死亡
+                if (this.y > VIEW_HEIGHT + 100) {
+                    this.die();
+                }
+            }
+
+            die() {
+                if (this.dead) return;
+                this.dead = true;
+                this.vy = -10; // 向上彈起
+                audio.playDie();
+                
+                setTimeout(() => {
+                    handleDeath();
+                }, 2000);
+            }
+
+            draw() {
+                ctx.save();
+                
+                // 水平翻轉繪製
+                let isLeft = this.facing === 'left';
+                let drawX = this.x - cameraX;
+                
+                if (isLeft) {
+                    ctx.scale(-1, 1);
+                    drawX = -drawX - this.width;
+                }
+
+                if (this.dead) {
+                    // 繪製死掉時的哭哭眼瑪利歐
+                    this.drawSprite(drawX, this.y, 'dead');
+                } else if (!this.onGround) {
+                    // 跳躍中
+                    this.drawSprite(drawX, this.y, 'jump');
+                } else if (Math.abs(this.vx) > 0.2) {
+                    // 奔跑中 (切換動畫幀)
+                    let step = Math.floor(this.walkCycle) % 3;
+                    this.drawSprite(drawX, this.y, 'run' + step);
+                } else {
+                    // 站立閒置
+                    this.drawSprite(drawX, this.y, 'idle');
+                }
+
+                ctx.restore();
+            }
+
+            // 畫瑪利歐的像素小人外觀
+            drawSprite(x, y, state) {
+                // 以 2x2 或 3x3 畫素進行畫布填色繪製經典造型
+                ctx.fillStyle = '#ff2400'; // 紅色 (衣服與帽子)
+                ctx.fillRect(x + 6, y, 20, 8); // 帽子
+                ctx.fillRect(x + 10, y + 2, 16, 2); // 帽沿
+                
+                ctx.fillStyle = '#ffcca3'; // 皮膚色
+                ctx.fillRect(x + 8, y + 8, 16, 12); // 臉
+                ctx.fillStyle = '#000000'; // 眼睛與鬍子
+                ctx.fillRect(x + 18, y + 10, 4, 4); // 眼睛
+                ctx.fillRect(x + 14, y + 14, 10, 4); // 鬍子
+
+                ctx.fillStyle = '#ff2400'; // 紅色衣服
+                ctx.fillRect(x + 6, y + 20, 20, 16);
+
+                ctx.fillStyle = '#0024ff'; // 藍色吊帶褲
+                ctx.fillRect(x + 8, y + 22, 4, 14);
+                ctx.fillRect(x + 20, y + 22, 4, 14);
+                ctx.fillRect(x + 8, y + 30, 16, 6);
+
+                ctx.fillStyle = '#fab400'; // 黃色扣子
+                ctx.fillRect(x + 10, y + 26, 2, 2);
+                ctx.fillRect(x + 20, y + 26, 2, 2);
+
+                ctx.fillStyle = '#8a5c00'; // 棕色鞋子
+                ctx.fillRect(x + 4, y + 38, 10, 6);
+                ctx.fillRect(x + 18, y + 38, 10, 6);
+
+                if (state === 'jump') {
+                    // 跳躍手部朝上
+                    ctx.fillStyle = '#ffcca3';
+                    ctx.fillRect(x + 20, y + 12, 6, 6);
+                }
+                
+                if (state === 'dead') {
+                    // 眼睛畫 X
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x + 14, y + 10); ctx.lineTo(x + 18, y + 14);
+                    ctx.moveTo(x + 18, y + 10); ctx.lineTo(x + 14, y + 14);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 2. 實體方塊 (地基、問號磚、普通磚)
+        class Block {
+            constructor(x, y, type, hasCoin = false) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 40;
+                this.type = type; // 'ground', 'brick', 'question', 'empty-question', 'pipe'
+                this.hasCoin = hasCoin;
+                this.originalY = y;
+                this.bounceY = 0;
+                this.bouncing = false;
+            }
+
+            triggerBounce() {
+                if (this.bouncing) return;
+                this.bouncing = true;
+                this.bounceY = -8;
+                
+                if (this.type === 'question') {
+                    if (this.hasCoin) {
+                        coins++;
+                        score += 200;
+                        audio.playCoin();
+                        // 彈出金幣效果
+                        spawnCoinEffect(this.x + 10, this.y - 20);
+                    }
+                    this.type = 'empty-question';
+                } else {
+                    audio.playBump();
+                }
+            }
+
+            update() {
+                if (this.bouncing) {
+                    this.bounceY += 0.8;
+                    if (this.bounceY >= 0) {
+                        this.bounceY = 0;
+                        this.bouncing = false;
+                    }
+                }
+            }
+
+            draw() {
+                let drawX = this.x - cameraX;
+                let drawY = this.y + this.bounceY;
+
+                if (this.type === 'ground') {
+                    // 泥土與草地地表
+                    ctx.fillStyle = '#d88038'; // 磚紅泥土
+                    ctx.fillRect(drawX, drawY, this.width, this.height);
+                    ctx.fillStyle = '#24db10'; // 綠草頂部
+                    ctx.fillRect(drawX, drawY, this.width, 8);
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                } 
+                else if (this.type === 'brick') {
+                    // 磚牆
+                    ctx.fillStyle = '#b84418';
+                    ctx.fillRect(drawX, drawY, this.width, this.height);
+                    // 磚格細線
+                    ctx.strokeStyle = '#f8b890';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                    ctx.beginPath();
+                    ctx.moveTo(drawX, drawY + 13); ctx.lineTo(drawX + this.width, drawY + 13);
+                    ctx.moveTo(drawX, drawY + 27); ctx.lineTo(drawX + this.width, drawY + 27);
+                    // 垂直磚紋
+                    ctx.moveTo(drawX + 13, drawY); ctx.lineTo(drawX + 13, drawY + 13);
+                    ctx.moveTo(drawX + 27, drawY + 13); ctx.lineTo(drawX + 27, drawY + 27);
+                    ctx.moveTo(drawX + 13, drawY + 27); ctx.lineTo(drawX + 13, drawY + 40);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                } 
+                else if (this.type === 'question') {
+                    // 問號箱
+                    ctx.fillStyle = '#fcb014';
+                    ctx.fillRect(drawX, drawY, this.width, this.height);
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                    // 繪製閃亮問號 "?"
+                    ctx.fillStyle = '#6b4c00';
+                    ctx.font = 'bold 20px "Press Start 2P"';
+                    ctx.fillText('?', drawX + 12, drawY + 28);
+                } 
+                else if (this.type === 'empty-question') {
+                    // 敲擊過的鐵塊
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(drawX, drawY, this.width, this.height);
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                    // 四角鉚釘
+                    ctx.fillStyle = '#404040';
+                    ctx.fillRect(drawX + 4, drawY + 4, 4, 4);
+                    ctx.fillRect(drawX + 32, drawY + 4, 4, 4);
+                    ctx.fillRect(drawX + 4, drawY + 32, 4, 4);
+                    ctx.fillRect(drawX + 32, drawY + 32, 4, 4);
+                }
+                else if (this.type === 'solid-stone') {
+                    // 實心灰白石磚 (例如終點前的階梯)
+                    ctx.fillStyle = '#f8b890';
+                    ctx.fillRect(drawX, drawY, this.width, this.height);
+                    ctx.strokeStyle = '#000';
+                    ctx.strokeRect(drawX, drawY, this.width, this.height);
+                }
+            }
+        }
+
+        // 3. 栗寶寶怪物 (Goomba)
+        class Goomba {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 32;
+                this.height = 32;
+                this.vx = -1.2;
+                this.vy = 0;
+                this.alive = true;
+                this.squished = false;
+                this.squishTimer = 0;
+                this.walkCycle = 0;
+            }
+
+            update() {
+                if (this.squished) {
+                    this.squishTimer++;
+                    if (this.squishTimer > 30) {
+                        this.alive = false;
+                    }
+                    return;
+                }
+
+                // 怪物重力
+                this.vy += GRAVITY;
+                this.y += this.vy;
+
+                // 怪物左右移動
+                this.x += this.vx;
+                this.walkCycle += 0.1;
+
+                // 與方塊的碰撞檢測 (橫向移動)
+                blocks.forEach(block => {
+                    if (checkCollision(this, block)) {
+                        // 撞牆反彈
+                        this.vx = -this.vx;
+                        this.x += this.vx;
+                    }
+                });
+            }
+
+            squish() {
+                this.squished = true;
+                this.vx = 0;
+                audio.playStomp();
+                score += 100;
+            }
+
+            draw() {
+                if (!this.alive) return;
+                let drawX = this.x - cameraX;
+
+                if (this.squished) {
+                    // 扁平的栗寶寶
+                    ctx.fillStyle = '#a0522d'; // 棕色
+                    ctx.fillRect(drawX, this.y + 20, this.width, 12);
+                    ctx.fillStyle = '#ffcca3'; // 皮膚色臉部
+                    ctx.fillRect(drawX + 4, this.y + 20, this.width - 8, 4);
+                    return;
+                }
+
+                // Goomba 頭部 (香菇形狀)
+                ctx.fillStyle = '#a0522d'; 
+                ctx.beginPath();
+                ctx.moveTo(drawX + 16, this.y);
+                ctx.bezierCurveTo(drawX - 2, this.y + 2, drawX - 2, this.y + 24, drawX + 16, this.y + 24);
+                ctx.bezierCurveTo(drawX + 34, this.y + 24, drawX + 34, this.y + 2, drawX + 16, this.y);
+                ctx.fill();
+
+                // 憤怒的眼角
+                ctx.fillStyle = '#000';
+                ctx.fillRect(drawX + 8, this.y + 8, 5, 5);
+                ctx.fillRect(drawX + 19, this.y + 8, 5, 5);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(drawX + 10, this.y + 10, 2, 2);
+                ctx.fillRect(drawX + 21, this.y + 10, 2, 2);
+
+                // 嘴巴 (兩顆利齒)
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(drawX + 12, this.y + 18, 3, 3);
+                ctx.fillRect(drawX + 17, this.y + 18, 3, 3);
+
+                // 腳
+                ctx.fillStyle = '#404040';
+                let offset = Math.floor(this.walkCycle) % 2 === 0 ? 3 : -3;
+                ctx.fillRect(drawX + 4 + offset, this.y + 24, 8, 8);
+                ctx.fillRect(drawX + 20 - offset, this.y + 24, 8, 8);
+            }
+        }
+
+        // 4. 水管 (Pipe) 實體
+        class Pipe {
+            constructor(x, y, height) {
+                this.x = x;
+                this.y = y;
+                this.width = 70;
+                this.height = height;
+            }
+
+            draw() {
+                let drawX = this.x - cameraX;
+                // 畫綠色水管
+                ctx.fillStyle = '#00a800';
+                ctx.fillRect(drawX, this.y, this.width, this.height);
+                
+                // 水管頭部
+                ctx.fillStyle = '#00d800';
+                ctx.fillRect(drawX - 4, this.y, this.width + 8, 24);
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(drawX - 4, this.y, this.width + 8, 24);
+                
+                // 水管黑邊框與陰影細部
+                ctx.strokeRect(drawX, this.y, this.width, this.height);
+                ctx.fillStyle = '#004800';
+                ctx.fillRect(drawX + 10, this.y + 24, 8, this.height - 24);
+            }
+        }
+
+        // 5. 特效金幣 (撞擊問號時跳出動畫)
+        class CoinEffect {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = -10;
+                this.active = true;
+                this.timer = 0;
+            }
+
+            update() {
+                this.vy += GRAVITY;
+                this.y += this.vy;
+                this.timer++;
+                if (this.timer > 25) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                if (!this.active) return;
+                let drawX = this.x - cameraX;
+                ctx.fillStyle = '#fcb014';
+                ctx.beginPath();
+                ctx.arc(drawX + 10, this.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+            }
+        }
+
+        // 6. 靜態可收集金幣
+        class GoldCoin {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 24;
+                this.height = 24;
+                this.animTimer = Math.random() * 10;
+            }
+
+            update() {
+                this.animTimer += 0.15;
+            }
+
+            draw() {
+                let drawX = this.x - cameraX;
+                let scaleX = Math.abs(Math.sin(this.animTimer));
+                ctx.save();
+                ctx.translate(drawX + 12, this.y + 12);
+                ctx.scale(scaleX, 1);
+                ctx.fillStyle = '#fcb014';
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // 7. 背景飾品 (雲與草叢)
+        class BackgroundItem {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'cloud', 'bush'
+            }
+
+            draw() {
+                let drawX = this.x - cameraX * 0.4; // 視差滾動效果
+                if (this.type === 'cloud') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(drawX, this.y, 20, 0, Math.PI * 2);
+                    ctx.arc(drawX + 15, this.y - 10, 25, 0, Math.PI * 2);
+                    ctx.arc(drawX + 35, this.y, 20, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.type === 'bush') {
+                    ctx.fillStyle = '#24db10';
+                    ctx.beginPath();
+                    ctx.arc(drawX, this.y, 16, 0, Math.PI * 2);
+                    ctx.arc(drawX + 12, this.y - 8, 20, 0, Math.PI * 2);
+                    ctx.arc(drawX + 24, this.y, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // --- 全局遊戲物件集合 ---
+        let player = new Player();
+        let blocks = [];
+        let enemies = [];
+        let coinsList = [];
+        let coinEffects = [];
+        let pipes = [];
+        let backgroundItems = [];
+
+        // 旗桿座標
+        const FLAGPOLE_X = 3500;
+        const FLAGPOLE_Y = 120;
+        const CASTLE_X = 3680;
+
+        // --- 地圖產生器 ---
+        function createWorld() {
+            blocks = [];
+            enemies = [];
+            pipes = [];
+            coinsList = [];
+            coinEffects = [];
+            backgroundItems = [];
+
+            // 1. 背景飾品 (隨機雲、草叢)
+            for (let i = 0; i < 20; i++) {
+                backgroundItems.push(new BackgroundItem(150 + i * 250, 100 + (i % 3) * 30, 'cloud'));
+                backgroundItems.push(new BackgroundItem(100 + i * 300, 395, 'bush'));
+            }
+
+            // 2. 地表平台 (基礎高度是 y=428, 地面厚度 80px 至畫布底端)
+            // 在中途放置一些深淵(空隙)
+            let currentX = 0;
+            while (currentX < 4000) {
+                // 定義一些深淵
+                let isPit = false;
+                if ((currentX >= 600 && currentX <= 680) || 
+                    (currentX >= 1300 && currentX <= 1380) ||
+                    (currentX >= 2200 && currentX <= 2320)) {
+                    isPit = true;
+                }
+
+                if (!isPit) {
+                    // 地面方塊
+                    blocks.push(new Block(currentX, 428, 'ground'));
+                }
+                currentX += 40;
+            }
+
+            // 3. 水管
+            pipes.push(new Pipe(320, 348, 80));
+            pipes.push(new Pipe(800, 308, 120));
+            pipes.push(new Pipe(1600, 348, 80));
+            pipes.push(new Pipe(2600, 308, 120));
+
+            // 將水管視為特殊的實體障礙物
+            pipes.forEach(pipe => {
+                blocks.push(new Block(pipe.x, pipe.y, 'pipe-block')); // 佔位實體
+                blocks.push(new Block(pipe.x + 40, pipe.y, 'pipe-block'));
+            });
+
+            // 4. 空中磚塊 & 問號磚塊配置
+            const blockConfig = [
+                // 起步區
+                {x: 200, y: 300, type: 'brick'},
+                {x: 240, y: 300, type: 'question', hasCoin: true},
+                {x: 280, y: 300, type: 'brick'},
+                
+                // 第一水管後
+                {x: 480, y: 300, type: 'question', hasCoin: true},
+                {x: 520, y: 300, type: 'brick'},
+                {x: 560, y: 300, type: 'question', hasCoin: true},
+
+                // 巨型磚塊台
+                {x: 1000, y: 300, type: 'brick'},
+                {x: 1040, y: 300, type: 'brick'},
+                {x: 1080, y: 300, type: 'question', hasCoin: true},
+                {x: 1120, y: 300, type: 'brick'},
+                {x: 1160, y: 300, type: 'brick'},
+
+                // 高層磚塊
+                {x: 1040, y: 180, type: 'brick'},
+                {x: 1080, y: 180, type: 'brick'},
+                {x: 1120, y: 180, type: 'brick'},
+
+                // 中期挑戰
+                {x: 1480, y: 300, type: 'brick'},
+                {x: 1520, y: 300, type: 'question', hasCoin: true},
+                {x: 1560, y: 300, type: 'brick'},
+
+                // 後期高難度連續問號與磚塊
+                {x: 1800, y: 260, type: 'question', hasCoin: true},
+                {x: 1840, y: 260, type: 'question', hasCoin: true},
+                {x: 1880, y: 260, type: 'question', hasCoin: true},
+
+                {x: 2040, y: 300, type: 'brick'},
+                {x: 2080, y: 300, type: 'brick'},
+
+                // 終點前階梯
+                {x: 3200, y: 388, type: 'solid-stone'},
+                {x: 3240, y: 388, type: 'solid-stone'},
+                {x: 3240, y: 348, type: 'solid-stone'},
+                {x: 3280, y: 388, type: 'solid-stone'},
+                {x: 3280, y: 348, type: 'solid-stone'},
+                {x: 3280, y: 308, type: 'solid-stone'},
+                {x: 3320, y: 388, type: 'solid-stone'},
+                {x: 3320, y: 348, type: 'solid-stone'},
+                {x: 3320, y: 308, type: 'solid-stone'},
+                {x: 3320, y: 268, type: 'solid-stone'},
+            ];
+
+            blockConfig.forEach(cfg => {
+                blocks.push(new Block(cfg.x, cfg.y, cfg.type, cfg.hasCoin));
+            });
+
+            // 5. 放置靜態可收集金幣
+            const coinPositions = [
+                {x: 240, y: 240},
+                {x: 440, y: 380},
+                {x: 720, y: 380},
+                {x: 900, y: 380},
+                {x: 1080, y: 120},
+                {x: 1520, y: 240},
+                {x: 2400, y: 380},
+                {x: 2800, y: 380},
+                {x: 2900, y: 380},
+            ];
+            coinPositions.forEach(pos => {
+                coinsList.push(new GoldCoin(pos.x, pos.y));
+            });
+
+            // 6. 放置栗寶寶 (Goombas) 怪物
+            const goombaX = [250, 480, 750, 950, 1200, 1500, 1750, 2000, 2450, 2750, 3000];
+            goombaX.forEach(x => {
+                enemies.push(new Goomba(x, 200));
+            });
+        }
+
+        // 輔助特效
+        function spawnCoinEffect(x, y) {
+            coinEffects.push(new CoinEffect(x, y));
+        }
+
+        // --- 核心碰撞偵測演算法 ---
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function resolveCollisions() {
+            if (player.dead || player.victoryAnim) return;
+
+            // 瑪利歐在地面的狀態重設
+            let stoodOnPlatform = false;
+
+            // 與所有實體磚塊進行碰撞計算
+            blocks.forEach(block => {
+                // 過濾掉非實體的特殊標記
+                if (block.type === 'pipe-block') {
+                    // 水管內部實體
+                    block.width = 40;
+                    block.height = 40;
+                }
+
+                if (checkCollision(player, block)) {
+                    // 計算重疊向量
+                    let overlapX = Math.min(player.x + player.width, block.x + block.width) - Math.max(player.x, block.x);
+                    let overlapY = Math.min(player.y + player.height, block.y + block.height) - Math.max(player.y, block.y);
+
+                    if (overlapX < overlapY) {
+                        // 橫向碰撞
+                        if (player.x < block.x) {
+                            player.x -= overlapX;
+                        } else {
+                            player.x += overlapX;
+                        }
+                        player.vx = 0;
+                    } else {
+                        // 縱向碰撞
+                        if (player.y < block.y) {
+                            // 站在頂部
+                            player.y -= overlapY;
+                            player.vy = 0;
+                            player.onGround = true;
+                            stoodOnPlatform = true;
+                        } else {
+                            // 從下方頂撞方塊
+                            player.y += overlapY;
+                            player.vy = 0.5; // 給予往下彈的速度
+                            block.triggerBounce();
+                        }
+                    }
+                }
+            });
+
+            // 特殊的水管本體精細碰撞
+            pipes.forEach(pipe => {
+                if (player.x + player.width > pipe.x && player.x < pipe.x + pipe.width) {
+                    if (player.y + player.height > pipe.y && player.y + player.height - player.vy <= pipe.y + 12) {
+                        // 站上水管
+                        player.y = pipe.y - player.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                        stoodOnPlatform = true;
+                    } else if (player.y + player.height > pipe.y && player.y < pipe.y + pipe.height) {
+                        // 左右側擦撞
+                        if (player.x + player.width / 2 < pipe.x + pipe.width / 2) {
+                            player.x = pipe.x - player.width;
+                        } else {
+                            player.x = pipe.x + pipe.width;
+                        }
+                        player.vx = 0;
+                    }
+                }
+            });
+
+            if (!stoodOnPlatform) {
+                player.onGround = false;
+            }
+
+            // 與靜態金幣碰撞
+            for (let i = coinsList.length - 1; i >= 0; i--) {
+                let coin = coinsList[i];
+                if (checkCollision(player, coin)) {
+                    coinsList.splice(i, 1);
+                    coins++;
+                    score += 200;
+                    audio.playCoin();
+                }
+            }
+
+            // 與怪物碰撞偵測
+            enemies.forEach(enemy => {
+                if (!enemy.alive || enemy.squished) return;
+
+                if (checkCollision(player, enemy)) {
+                    // 判斷是否為「從上方踩落」
+                    // 如果瑪利歐的足部 y 座標靠近怪物頂部，且正在往下掉
+                    let isFalling = player.vy > 0;
+                    let isAbove = (player.y + player.height - player.vy) <= (enemy.y + 12);
+
+                    if (isAbove && isFalling) {
+                        // 踩死怪物
+                        enemy.squish();
+                        // 瑪利歐向上彈跳
+                        player.vy = -8.5;
+                        player.onGround = false;
+                    } else {
+                        // 沒踩到，瑪利歐受傷死亡
+                        player.die();
+                    }
+                }
+            });
+
+            // 抵達終點旗桿檢測
+            if (player.x >= FLAGPOLE_X && !player.victoryAnim) {
+                startVictorySequence();
+            }
+        }
+
+        // --- 勝利過場動畫 ---
+        function startVictorySequence() {
+            player.victoryAnim = true;
+            player.vx = 0;
+            player.vy = 0;
+            audio.playStageClear();
+
+            // 停用定時器
+            clearInterval(timerInterval);
+
+            // 過渡到城堡後彈出勝利 UI
+            setTimeout(() => {
+                isVictory = true;
+                gameActive = false;
+                
+                // 結算分數
+                let timeBonus = timeLeft * 10;
+                let finalScoreValue = score + timeBonus;
+
+                document.getElementById('final-score').innerText = String(finalScoreValue).padStart(6, '0');
+                document.getElementById('final-coins').innerText = coins;
+                document.getElementById('final-time').innerText = timeLeft;
+
+                document.getElementById('victory-screen').classList.remove('hidden');
+            }, 3000);
+        }
+
+        // --- 死亡處理 ---
+        function handleDeath() {
+            lives--;
+            if (lives <= 0) {
+                isGameOver = true;
+                gameActive = false;
+                clearInterval(timerInterval);
+                document.getElementById('gameover-reason').innerText = "生命已用盡！請再次挑戰。";
+                document.getElementById('gameover-screen').classList.remove('hidden');
+            } else {
+                // 重置世界，生命減少 1 但關卡進度回到起點
+                resetLevelKeepProgress();
+            }
+        }
+
+        function resetLevelKeepProgress() {
+            player.reset();
+            cameraX = 0;
+            createWorld();
+        }
+
+        // --- 遊戲全局重置 ---
+        function fullReset() {
+            score = 0;
+            coins = 0;
+            timeLeft = 300;
+            lives = 3;
+            isGameOver = false;
+            isVictory = false;
+            player.reset();
+            cameraX = 0;
+            createWorld();
+
+            // UI 隱藏
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('victory-screen').classList.add('hidden');
+
+            // 啟動倒數定時器
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (gameActive && !player.dead && !player.victoryAnim) {
+                    timeLeft--;
+                    if (timeLeft <= 0) {
+                        player.die();
+                    }
+                }
+            }, 1000);
+
+            gameActive = true;
+        }
+
+        // --- 繪製終點背景 (旗桿與城堡) ---
+        function drawGoalElements() {
+            // 1. 旗桿
+            let poleX = FLAGPOLE_X - cameraX;
+            ctx.fillStyle = '#f8f8f8'; // 灰白色旗桿
+            ctx.fillRect(poleX, FLAGPOLE_Y, 8, 308);
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(poleX, FLAGPOLE_Y, 8, 308);
+
+            // 頂部圓球
+            ctx.fillStyle = '#24db10';
+            ctx.beginPath();
+            ctx.arc(poleX + 4, FLAGPOLE_Y, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 綠色旗幟 (隨瑪利歐踩中位置會滑動，此處簡化為固定在頂端或隨動畫下降)
+            let flagY = FLAGPOLE_Y + 20;
+            if (player.victoryAnim && player.y < 350) {
+                flagY = player.y;
+            }
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(poleX - 35, flagY);
+            ctx.lineTo(poleX, flagY - 10);
+            ctx.lineTo(poleX, flagY + 15);
+            ctx.lineTo(poleX - 35, flagY + 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 旗幟中央畫一個經典的紅色骷髏或徽章
+            ctx.fillStyle = '#ff2400';
+            ctx.fillRect(poleX - 22, flagY, 8, 6);
+
+            // 2. 終點城堡
+            let castleX = CASTLE_X - cameraX;
+            ctx.fillStyle = '#9c9c9c'; // 灰色石牆
+            ctx.fillRect(castleX, 268, 120, 160); // 城堡主體
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(castleX, 268, 120, 160);
+
+            // 城堡屋頂凹凸鋸齒 (城牆垛)
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(castleX + i * 25, 248, 18, 20);
+                ctx.strokeRect(castleX + i * 25, 248, 18, 20);
+            }
+
+            // 城堡中央黑洞拱門
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(castleX + 45, 348, 30, 80);
+            
+            // 城堡頂部綠色小旗子
+            ctx.fillStyle = '#24db10';
+            ctx.fillRect(castleX + 55, 208, 4, 40);
+            ctx.fillStyle = '#ff2400';
+            ctx.beginPath();
+            ctx.moveTo(castleX + 25, 218);
+            ctx.lineTo(castleX + 55, 210);
+            ctx.lineTo(castleX + 55, 226);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // --- UI 更新輔助 ---
+        function updateHUD() {
+            document.getElementById('score-text').innerText = String(score).padStart(6, '0');
+            document.getElementById('coin-text').innerText = `🪙 x${String(coins).padStart(2, '0')}`;
+            document.getElementById('time-text').innerText = String(timeLeft).padStart(3, '0');
+            document.getElementById('lives-text').innerText = `❤️ x${lives}`;
+        }
+
+        // --- 主遊戲更新循環 (Game Loop) ---
+        function gameLoop(timestamp) {
+            ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+            if (gameActive) {
+                // 1. 物理與狀態更新
+                player.update();
+
+                // 水平攝影機追隨玩家 (維持在畫面中央)
+                if (player.x > VIEW_WIDTH / 2) {
+                    cameraX = player.x - VIEW_WIDTH / 2;
+                }
+                // 攝影機上限不超過關卡邊界 (地圖全長約 4000)
+                if (cameraX > 3200) {
+                    cameraX = 3200;
+                }
+
+                // 更新所有實體物件
+                blocks.forEach(block => block.update());
+                enemies.forEach(enemy => enemy.update());
+                coinsList.forEach(coin => coin.update());
+                
+                coinEffects.forEach(effect => effect.update());
+                // 濾除失效的特效
+                coinEffects = coinEffects.filter(e => e.active);
+
+                // 碰撞與邊界處理
+                resolveCollisions();
+            }
+
+            // 2. 渲染繪製順序
+            
+            // 背景底色渲染 (天空漸層)
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, VIEW_HEIGHT);
+            skyGrad.addColorStop(0, '#5c94fc');
+            skyGrad.addColorStop(1, '#b8e8fc');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+            // 繪製背景裝飾 (雲與草)
+            backgroundItems.forEach(item => item.draw());
+
+            // 繪製水管
+            pipes.forEach(pipe => pipe.draw());
+
+            // 繪製所有關卡方塊
+            blocks.forEach(block => {
+                if (block.type !== 'pipe-block') {
+                    block.draw();
+                }
+            });
+
+            // 繪製收集性金幣
+            coinsList.forEach(coin => coin.draw());
+
+            // 繪製金幣特效
+            coinEffects.forEach(effect => effect.draw());
+
+            // 繪製終點旗桿與城堡
+            drawGoalElements();
+
+            // 繪製所有怪物
+            enemies.forEach(enemy => enemy.draw());
+
+            // 繪製主角瑪利歐
+            player.draw();
+
+            // 更新網頁 HUD 數字
+            updateHUD();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- 輸入控制監聽 ---
+
+        // 鍵盤按下事件
+        window.addEventListener('keydown', e => {
+            if (!gameActive || player.dead || player.victoryAnim) return;
+
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                keys.left = true;
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                keys.right = true;
+            }
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                keys.jump = true;
+            }
+        });
+
+        // 鍵盤放開事件
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                keys.left = false;
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                keys.right = false;
+            }
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                keys.jump = false;
+            }
+        });
+
+        // --- 手機螢幕虛擬按鈕事件 (Touch Events) ---
+        
+        function setupMobileControls() {
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+            const btnJump = document.getElementById('btn-jump');
+
+            // 左按鈕
+            btnLeft.addEventListener('touchstart', e => {
+                e.preventDefault();
+                keys.left = true;
+            });
+            btnLeft.addEventListener('touchend', e => {
+                e.preventDefault();
+                keys.left = false;
+            });
+
+            // 右按鈕
+            btnRight.addEventListener('touchstart', e => {
+                e.preventDefault();
+                keys.right = true;
+            });
+            btnRight.addEventListener('touchend', e => {
+                e.preventDefault();
+                keys.right = false;
+            });
+
+            // 跳躍 A 按鈕
+            btnJump.addEventListener('touchstart', e => {
+                e.preventDefault();
+                keys.jump = true;
+            });
+            btnJump.addEventListener('touchend', e => {
+                e.preventDefault();
+                keys.jump = false;
+            });
+        }
+
+        // --- UI 按鈕事件綁定 ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            audio.init(); // 觸發 Web Audio 解鎖
+            fullReset();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            fullReset();
+        });
+
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            fullReset();
+        });
+
+        // 初始化
+        window.onload = function() {
+            setupMobileControls();
+            createWorld();
+            // 開始動畫幀循環
+            requestAnimationFrame(gameLoop);
+        };
+
+    </script>
+</body>
+</html>
